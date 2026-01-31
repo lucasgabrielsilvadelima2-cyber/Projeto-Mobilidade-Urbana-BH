@@ -1,0 +1,172 @@
+# Docker Compose para BH Mobilidade Pipeline
+# Orquestração completa do ambiente de desenvolvimento
+
+version: '3.8'
+
+services:
+  # Pipeline Principal
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bh-mobilidade-pipeline
+    image: bh-mobilidade:latest
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Dados persistentes
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Configurações (read-only)
+      - ./config:/app/config:ro
+      # Código fonte (para desenvolvimento)
+      - ./src:/app/src
+    networks:
+      - mobilidade-network
+    restart: unless-stopped
+    command: python src/pipeline.py
+
+  # Jupyter Notebook (para análises)
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bh-mobilidade-jupyter
+    image: bh-mobilidade:latest
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - ENVIRONMENT=development
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/app/notebooks
+      - ./data:/app/data:ro
+      - ./src:/app/src:ro
+    networks:
+      - mobilidade-network
+    command: >
+      jupyter lab
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --allow-root
+      --NotebookApp.token=''
+      --NotebookApp.password=''
+    restart: unless-stopped
+
+  # PostgreSQL (opcional - para metadados)
+  postgres:
+    image: postgres:15-alpine
+    container_name: bh-mobilidade-db
+    environment:
+      POSTGRES_DB: bh_mobilidade
+      POSTGRES_USER: dataeng
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - mobilidade-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dataeng"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PgAdmin (interface web para PostgreSQL)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: bh-mobilidade-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@beanalytic.com
+      PGADMIN_DEFAULT_PASSWORD: changeme
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - mobilidade-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  # MinIO (S3-compatible storage local)
+  minio:
+    image: minio/minio:latest
+    container_name: bh-mobilidade-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - mobilidade-network
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# Volumes persistentes
+volumes:
+  postgres-data:
+    driver: local
+  pgadmin-data:
+    driver: local
+  minio-data:
+    driver: local
+
+# Rede dedicada
+networks:
+  mobilidade-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ====================================
+# COMANDOS ÚTEIS
+# ====================================
+#
+# Iniciar todos os serviços:
+#   docker-compose up -d
+#
+# Ver logs do pipeline:
+#   docker-compose logs -f pipeline
+#
+# Executar pipeline manualmente:
+#   docker-compose exec pipeline python src/pipeline.py
+#
+# Acessar shell do container:
+#   docker-compose exec pipeline bash
+#
+# Executar testes:
+#   docker-compose exec pipeline pytest -v
+#
+# Parar todos os serviços:
+#   docker-compose down
+#
+# Parar e remover volumes:
+#   docker-compose down -v
+#
+# Rebuild das imagens:
+#   docker-compose build --no-cache
+#
+# ====================================
+# ACESSO ÀS INTERFACES
+# ====================================
+#
+# Jupyter Lab:    http://localhost:8888
+# PgAdmin:        http://localhost:5050
+# MinIO Console:  http://localhost:9001
+# PostgreSQL:     localhost:5432

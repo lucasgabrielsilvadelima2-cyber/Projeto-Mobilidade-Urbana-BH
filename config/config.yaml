@@ -1,0 +1,109 @@
+# Configurações do Pipeline de Dados - Mobilidade Urbana BH
+
+pipeline:
+  name: "bh_mobilidade_urbana_pipeline"
+  version: "1.0.0"
+  description: "Pipeline de dados de mobilidade urbana de Belo Horizonte"
+
+# Fontes de Dados
+data_sources:
+  onibus_tempo_real:
+    url: "https://temporeal.pbh.gov.br/v1/posicoes"
+    format: "json"
+    update_frequency_minutes: 1
+    enabled: true
+    
+  mco:
+    url: "https://dados.pbh.gov.br/dataset/mapa-de-controle-operacional-mco"
+    format: "csv"
+    update_frequency_minutes: 1440  # Atualizado diariamente
+    enabled: true
+
+# Configurações das Camadas
+layers:
+  bronze:
+    path: "./data/bronze"
+    format: "parquet"
+    compression: "snappy"
+    partitioning:
+      - "year"
+      - "month"
+      - "day"
+    retention_days: 90
+    
+  silver:
+    path: "./data/silver"
+    format: "delta"
+    partitioning:
+      - "date"
+    retention_days: 180
+    enable_cdc: true
+    
+  gold:
+    path: "./data/gold"
+    format: "delta"
+    retention_days: 365
+    enable_aggregations: true
+
+# Qualidade de Dados
+data_quality:
+  enabled: true
+  validation_rules:
+    onibus:
+      - column: "latitude"
+        rule: "between"
+        min: -20.0
+        max: -19.7
+      - column: "longitude"
+        rule: "between"
+        min: -44.1
+        max: -43.8
+      - column: "velocidade"
+        rule: "non_negative"
+      - column: "timestamp"
+        rule: "not_null"
+    
+  alert_on_failure: true
+  max_error_rate: 0.05
+
+# Governança de Dados
+governance:
+  enable_lineage: true
+  enable_audit_log: true
+  data_classification:
+    level: "public"
+    sensitivity: "low"
+  
+# Métricas de Negócio (Gold Layer)
+business_metrics:
+  - name: "velocidade_media_por_linha"
+    description: "Velocidade média dos ônibus por linha"
+    aggregation: "avg"
+    group_by: ["linha", "data"]
+    
+  - name: "total_onibus_ativos"
+    description: "Total de ônibus ativos por período"
+    aggregation: "count"
+    group_by: ["data", "hora"]
+    
+  - name: "cobertura_geografica"
+    description: "Cobertura geográfica das linhas"
+    aggregation: "custom"
+    
+  - name: "pontos_criticos_velocidade"
+    description: "Identificação de pontos com baixa velocidade média"
+    aggregation: "custom"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/pipeline.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# Performance
+performance:
+  chunk_size: 10000
+  max_workers: 4
+  memory_limit_gb: 4

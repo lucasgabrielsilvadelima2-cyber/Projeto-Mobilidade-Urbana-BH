@@ -1,0 +1,198 @@
+# GitHub Actions CI/CD Pipeline
+# Executa testes, linting e validação em cada push/PR
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Job 1: Linting e Formatação
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Instalar dependências de linting
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 pylint mypy
+        
+    - name: Verificar formatação com Black
+      run: black --check src/ tests/
+      
+    - name: Lint com Flake8
+      run: flake8 src/ tests/ --max-line-length=100 --extend-ignore=E203,W503
+      
+    - name: Type checking com mypy
+      run: mypy src/ --ignore-missing-imports
+      continue-on-error: true
+
+  # Job 2: Testes Unitários
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        
+    - name: Instalar dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Executar testes com pytest
+      run: |
+        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+        
+    - name: Upload coverage para Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-${{ matrix.python-version }}
+      continue-on-error: true
+
+  # Job 3: Validação de Segurança
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Instalar dependências de segurança
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit
+        
+    - name: Verificar vulnerabilidades em dependências
+      run: safety check --json
+      continue-on-error: true
+      
+    - name: Scan de segurança com Bandit
+      run: bandit -r src/ -f json -o bandit-report.json
+      continue-on-error: true
+      
+    - name: Upload relatório Bandit
+      uses: actions/upload-artifact@v4
+      with:
+        name: bandit-report
+        path: bandit-report.json
+      if: always()
+
+  # Job 4: Build Docker
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+      if: github.event_name != 'pull_request'
+      
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: beanalytic/bh-mobilidade:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Test Docker image
+      run: |
+        docker run --rm beanalytic/bh-mobilidade:latest python -c "import src.pipeline; print('OK')"
+
+  # Job 5: Validação de Configuração
+  config:
+    name: Configuration Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Instalar PyYAML
+      run: pip install pyyaml
+      
+    - name: Validar config.yaml
+      run: |
+        python -c "import yaml; yaml.safe_load(open('config/config.yaml'))"
+        
+    - name: Verificar estrutura do projeto
+      run: |
+        test -d src/bronze || exit 1
+        test -d src/silver || exit 1
+        test -d src/gold || exit 1
+        test -f README.md || exit 1
+        test -f requirements.txt || exit 1
+        echo "✓ Estrutura do projeto validada"
+
+  # Job 6: Notificação
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [lint, test, security, config]
+    if: always()
+    
+    steps:
+    - name: Resultado do Pipeline
+      run: |
+        if [ "${{ needs.test.result }}" == "success" ]; then
+          echo "✅ Pipeline executado com sucesso!"
+        else
+          echo "❌ Pipeline falhou. Verifique os logs."
+          exit 1
+        fi
