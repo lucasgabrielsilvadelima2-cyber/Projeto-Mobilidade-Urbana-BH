@@ -8,11 +8,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="bh-mobilidade-pipeline",
     version="1.0.0",
-    author="BeAnalytic Data Team",
     description="Pipeline de dados de mobilidade urbana de Belo Horizonte",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/beanalytic/bh-mobilidade-pipeline",
+    url="https://github.com/seu-usuario/bh-mobilidade-pipeline",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     classifiers=[

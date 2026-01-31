@@ -393,11 +393,7 @@ mypy src/
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-## 👥 Autores
-
-- **BeAnalytic Data Team**
-
-## 🙏 Agradecimentos
+## � Agradecimentos
 
 - Prefeitura de Belo Horizonte pelo Portal de Dados Abertos
 - Comunidade open source pelos frameworks utilizados
@@ -405,7 +401,6 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 ## 📞 Contato
 
 Para dúvidas ou sugestões:
-- Email: data-team@beanalytic.com
 - Issues: [GitHub Issues](https://github.com/seu-usuario/bh-mobilidade-pipeline/issues)
 
 ---

@@ -251,7 +251,6 @@ MIT License - Veja [LICENSE](LICENSE) para detalhes.
 
 - **Prefeitura de BH**: Portal de Dados Abertos
 - **Comunidade Python**: Frameworks open source
-- **BeAnalytic**: Oportunidade de desenvolver este case
 
 ---
 

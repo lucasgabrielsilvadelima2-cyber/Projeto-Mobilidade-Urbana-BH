@@ -4,7 +4,6 @@
 FROM python:3.11-slim
 
 # Metadados
-LABEL maintainer="BeAnalytic Data Team"
 LABEL description="Pipeline de Dados de Mobilidade Urbana - Belo Horizonte"
 LABEL version="1.0.0"
 

@@ -428,7 +428,7 @@ Próximos passos sugeridos:
 
 ### Terminal 1: Estrutura
 ```bash
-cd "Case BeAnalytic"
+cd "Projeto Mobilidade Urbana BH"
 tree /F /A src
 ```
 

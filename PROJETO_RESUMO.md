@@ -356,7 +356,6 @@ make clean     # Limpar
 ## 📞 Suporte e Contato
 
 - **Issues**: GitHub Issues
-- **Email**: data-team@beanalytic.com
 - **Docs**: Consulte a pasta `docs/`
 - **Exemplos**: Execute `python exemplo_uso.py`
 
@@ -372,7 +371,6 @@ MIT License - Veja [LICENSE](LICENSE) para detalhes
 
 - **Prefeitura de Belo Horizonte**: Portal de Dados Abertos
 - **Comunidade Open Source**: Bibliotecas utilizadas
-- **BeAnalytic Team**: Desenvolvimento e manutenção
 
 ---
 

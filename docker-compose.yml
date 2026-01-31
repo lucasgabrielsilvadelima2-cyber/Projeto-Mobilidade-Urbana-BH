@@ -82,7 +82,7 @@ services:
     image: dpage/pgadmin4:latest
     container_name: bh-mobilidade-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@beanalytic.com
+      PGADMIN_DEFAULT_EMAIL: admin@localhost.com
       PGADMIN_DEFAULT_PASSWORD: changeme
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
