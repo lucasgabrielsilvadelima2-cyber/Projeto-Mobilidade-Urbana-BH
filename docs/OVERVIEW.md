@@ -242,16 +242,3 @@ results = pipeline.run(skip_bronze=True)
 ## 👥 Contribuindo
 
 Contribuições são bem-vindas! Veja [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes.
-
-## 📄 Licença
-
-MIT License - Veja [LICENSE](LICENSE) para detalhes.
-
-## 🙏 Agradecimentos
-
-- **Prefeitura de BH**: Portal de Dados Abertos
-- **Comunidade Python**: Frameworks open source
-
----
-
-**Desenvolvido com ❤️ para análise de mobilidade urbana**
