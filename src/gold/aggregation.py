@@ -80,8 +80,7 @@ class GoldAggregator:
         write_deltalake(
             table_path,
             data,
-            mode=mode,
-            engine="pyarrow"
+            mode=mode
         )
         
         logger.info(f"Tabela Gold criada: {table_path}")
@@ -187,7 +186,8 @@ class OnibusAtivosPorPeriodoAggregator(GoldAggregator):
                 agg_df = df.groupby(group_cols).agg(
                     total_registros=("latitude", "count")
                 ).reset_index()
-                agg_df["total_onibus_unicos"] = None
+                # Delta Lake não aceita tipo Null, usa 0 como placeholder
+                agg_df["total_onibus_unicos"] = 0
             
             # Adiciona dia da semana
             if "dia_semana" in df.columns:

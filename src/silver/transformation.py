@@ -68,8 +68,7 @@ class SilverTransformer:
             table_path,
             data,
             mode=mode,
-            partition_by=partition_cols,
-            engine="pyarrow"
+            partition_by=partition_cols
         )
         
         logger.info(f"Dados salvos na tabela Delta: {table_path}")
@@ -167,6 +166,18 @@ class OnibusTransformer(SilverTransformer):
             dropped = initial_count - len(df)
             if dropped > 0:
                 logger.warning(f"Removidos {dropped} registros com valores nulos críticos")
+            
+            # Remove coordenadas inválidas (0.0, ou fora da região de BH)
+            initial_count = len(df)
+            df = df[
+                (df["latitude"] != 0.0) & 
+                (df["longitude"] != 0.0) &
+                (df["latitude"].between(-20.1, -19.7)) &
+                (df["longitude"].between(-44.15, -43.8))
+            ]
+            dropped_coords = initial_count - len(df)
+            if dropped_coords > 0:
+                logger.warning(f"Removidos {dropped_coords} registros com coordenadas inválidas")
             
             # Remove duplicatas
             df = remove_duplicates(
@@ -337,28 +348,34 @@ def transform_all_sources(config: Dict[str, Any]) -> Dict[str, str]:
     """
     results = {}
     
-    # Transformação de ônibus
-    try:
-        onibus_transformer = OnibusTransformer(
-            bronze_path=config["layers"]["bronze"]["path"],
-            silver_path=config["layers"]["silver"]["path"]
-        )
-        df_onibus = onibus_transformer.transform()
-        results["onibus_posicoes"] = onibus_transformer.load(df_onibus)
-    except Exception as e:
-        logger.error(f"Falha na transformação de ônibus: {e}")
-        results["onibus_posicoes"] = f"ERROR: {e}"
+    # Transformação de ônibus (somente se habilitado)
+    if config.get("data_sources", {}).get("onibus_tempo_real", {}).get("enabled", False):
+        try:
+            onibus_transformer = OnibusTransformer(
+                bronze_path=config["layers"]["bronze"]["path"],
+                silver_path=config["layers"]["silver"]["path"]
+            )
+            df_onibus = onibus_transformer.transform()
+            results["onibus_posicoes"] = onibus_transformer.load(df_onibus)
+        except Exception as e:
+            logger.error(f"Falha na transformação de ônibus: {e}")
+            results["onibus_posicoes"] = f"ERROR: {e}"
+    else:
+        logger.info("Transformação de ônibus desabilitada na configuração")
     
-    # Transformação do MCO
-    try:
-        mco_transformer = MCOTransformer(
-            bronze_path=config["layers"]["bronze"]["path"],
-            silver_path=config["layers"]["silver"]["path"]
-        )
-        df_mco = mco_transformer.transform()
-        results["mco_linhas"] = mco_transformer.load(df_mco)
-    except Exception as e:
-        logger.error(f"Falha na transformação do MCO: {e}")
-        results["mco_linhas"] = f"ERROR: {e}"
+    # Transformação do MCO (somente se habilitado)
+    if config.get("data_sources", {}).get("mco", {}).get("enabled", False):
+        try:
+            mco_transformer = MCOTransformer(
+                bronze_path=config["layers"]["bronze"]["path"],
+                silver_path=config["layers"]["silver"]["path"]
+            )
+            df_mco = mco_transformer.transform()
+            results["mco_linhas"] = mco_transformer.load(df_mco)
+        except Exception as e:
+            logger.error(f"Falha na transformação do MCO: {e}")
+            results["mco_linhas"] = f"ERROR: {e}"
+    else:
+        logger.info("Transformação do MCO desabilitada na configuração")
     
     return results

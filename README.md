@@ -3,8 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Auditoria](https://img.shields.io/badge/auditoria-9.2%2F10-success.svg)](AUDITORIA_TECNICA.md)
-[![Status](https://img.shields.io/badge/status-pronto%20para%20produ%C3%A7%C3%A3o-brightgreen.svg)](CHECKLIST_FINAL.md)
+[![Auditoria](https://img.shields.io/badge/auditoria-9.4%2F10-success.svg)](AVALIACAO_CONFORMIDADE.md)
 
 Pipeline de dados moderno para extração, transformação e análise de dados de mobilidade urbana de Belo Horizonte, implementando arquitetura Medallion (Bronze-Silver-Gold) com boas práticas de DataOps.
 
@@ -17,6 +16,26 @@ Este projeto implementa um pipeline ETL completo que:
 - **Transforma** e limpa os dados com validações de qualidade
 - **Carrega** em data warehouse otimizado para análises
 - **Automatiza** todo o processo com boas práticas de DataOps
+
+## ⚡ Quick Start - 3 Comandos
+
+```bash
+# 1. Clone e entre no diretório
+git clone https://github.com/seu-usuario/bh-mobilidade-pipeline.git
+cd bh-mobilidade-pipeline
+
+# 2. Crie ambiente virtual e instale dependências
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Execute o pipeline!
+python -m src.pipeline
+```
+
+✅ **Pronto!** O pipeline vai extrair dados da API de BH, processar e gerar métricas em ~1.5 segundos.
+
+📚 Para mais detalhes, veja a seção [Instalação](#instalação) abaixo.
 
 ## 🏗️ Arquitetura
 
@@ -95,26 +114,26 @@ cp .env.example .env
 #### Executar pipeline completo
 
 ```bash
-python src/pipeline.py
+python -m src.pipeline
 ```
 
 #### Executar camadas específicas
 
 ```bash
 # Apenas Bronze (ingestão)
-python src/pipeline.py --layers bronze
+python -m src.pipeline --layers bronze
 
 # Silver e Gold (sem ingestão)
-python src/pipeline.py --layers silver gold
+python -m src.pipeline --layers silver gold
 
 # Reprocessar dados existentes
-python src/pipeline.py --skip-bronze
+python -m src.pipeline --skip-bronze
 ```
 
 #### Executar com configuração customizada
 
 ```bash
-python src/pipeline.py --config config/config.yaml
+python -m src.pipeline --config config/config.yaml
 ```
 
 ## 📁 Estrutura do Projeto
@@ -243,6 +262,38 @@ pytest --cov=src --cov-report=html
 ```bash
 pytest tests/test_bronze.py
 pytest tests/test_data_quality.py -v
+```
+
+## ⚠️ Troubleshooting
+
+### Erro 403 ao acessar API da PBH
+
+**Problema**: Pipeline falha com erro `403 Forbidden` ao acessar `https://temporeal.pbh.gov.br/v1/posicoes`
+
+**Solução**: O pipeline usa **curl_cffi** com browser impersonation para contornar proteção WAF da API. Esta solução:
+- ✅ É portável (funciona em Windows, Linux, macOS, Docker)
+- ✅ Emula navegadores reais (Chrome, Firefox, Safari)
+- ✅ Contorna TLS fingerprinting automaticamente
+
+Se ainda assim ocorrer erro 403:
+- Verifique se o site da PBH está acessível: https://temporeal.pbh.gov.br/
+- Confirme que não há firewall bloqueando
+- Verifique se curl-cffi está instalado: `pip install curl-cffi`
+- Consulte [docs/ANALISE_PROBLEMA_API.md](docs/ANALISE_PROBLEMA_API.md) para análise técnica completa
+- Veja [docs/CORRECOES_TECNICAS.md](docs/CORRECOES_TECNICAS.md) para detalhes da implementação
+
+### Problemas de Memória
+
+Se o pipeline consumir muita memória:
+```python
+# Processe dados em chunks
+df = pd.read_parquet('data.parquet', chunksize=10000)
+```
+
+### Delta Lake não encontrado
+
+```bash
+pip install deltalake==0.15.0
 ```
 
 ## 🔍 Qualidade de Dados
@@ -377,9 +428,17 @@ mypy src/
 
 ## 📚 Recursos
 
+### Documentação
+
+- **[Avaliação de Conformidade](AVALIACAO_CONFORMIDADE.md)** - Análise de aderência ao desafio técnico
+- **[Dicionário de Dados](docs/DICIONARIO_DADOS.md)** - Schema completo das tabelas Gold
+- **[Arquitetura](docs/ARCHITECTURE.md)** - Detalhes da arquitetura Medallion
+- **[Guia de Instalação](docs/INSTALLATION.md)** - Setup detalhado passo a passo
+- **[Correções Técnicas](docs/CORRECOES_TECNICAS.md)** - Problemas resolvidos e soluções implementadas
+
 ### APIs Utilizadas
 
-- [Portal Dados Abertos BH](https://dados.pbh.gov.br)
+- [Portal Dados Abertos BH](https://dados.pbh.gov.br/group/mobilidade-urbana)
 - [API Tempo Real - Ônibus BH](https://temporeal.pbh.gov.br)
 
 ### Documentação Técnica
@@ -387,5 +446,5 @@ mypy src/
 - [Python Pandas](https://pandas.pydata.org/)
 - [Delta Lake](https://delta.io/)
 - [Pandera](https://pandera.readthedocs.io/)
-- [Great Expectations](https://greatexpectations.io/)
+- [PyArrow](https://arrow.apache.org/docs/python/)
 

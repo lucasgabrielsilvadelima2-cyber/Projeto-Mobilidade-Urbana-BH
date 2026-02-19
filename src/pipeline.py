@@ -11,10 +11,10 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from bronze import ingest_all_sources
-from gold import aggregate_all_metrics
-from silver import transform_all_sources
-from utils import load_config, load_environment, setup_logging
+from .bronze import ingest_all_sources
+from .gold import aggregate_all_metrics
+from .silver import transform_all_sources
+from .utils import load_config, load_environment, setup_logging
 
 logger = logging.getLogger(__name__)
 

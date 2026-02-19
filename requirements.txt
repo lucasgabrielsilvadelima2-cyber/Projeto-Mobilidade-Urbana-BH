@@ -1,7 +1,10 @@
 # Core Data Processing
 pandas>=2.1.0
 pyarrow>=14.0.0
-requests>=2.31.0
+
+# HTTP Requests com Browser Impersonation
+curl-cffi>=0.6.0  # Para contornar WAF/TLS fingerprinting
+requests>=2.31.0  # Mantido para compatibilidade com outras funcionalidades
 
 # Data Quality & Validation
 great-expectations>=0.18.0

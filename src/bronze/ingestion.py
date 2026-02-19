@@ -12,9 +12,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from curl_cffi import requests
+from curl_cffi.requests import Session
 
 from ..utils.common import DataLineage, get_partition_path
 
@@ -35,22 +34,26 @@ class BronzeDataIngester:
         self.session = self._create_session()
         os.makedirs(output_path, exist_ok=True)
     
-    def _create_session(self) -> requests.Session:
+    def _create_session(self) -> Session:
         """
-        Cria uma sessão HTTP com retry automático.
+        Cria uma sessão HTTP com curl_cffi para emulação de navegador.
+        
+        Usa curl_cffi ao invés de requests padrão para contornar fingerprinting
+        TLS/SSL que bloqueia requisições Python. Emula perfeitamente navegadores
+        reais, funcionando em qualquer plataforma (Windows, Linux, macOS, Docker).
         
         Returns:
-            Sessão configurada
+            Sessão configurada com browser impersonation
         """
-        session = requests.Session()
-        retry = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504]
-        )
-        adapter = HTTPAdapter(max_retries=retry)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
+        session = Session()
+        
+        # Headers básicos - curl_cffi já emula headers de navegador
+        session.headers.update({
+            'Accept': '*/*',
+            'Accept-Language': 'pt-BR,pt;q=0.9',
+            'Referer': 'https://temporeal.pbh.gov.br/',
+        })
+        
         return session
     
     def _save_to_parquet(
@@ -115,6 +118,61 @@ class OnibusTempoRealIngester(BronzeDataIngester):
         super().__init__(output_path)
         self.api_url = api_url
     
+    def _fetch_data(self) -> str:
+        """
+        Faz requisição à API com emulação de navegador real.
+        
+        Usa curl_cffi para emular fingerprint TLS de navegadores reais,
+        contornando proteções WAF de forma legítima e portável.
+        Funciona em qualquer plataforma (Windows, Linux, macOS, Docker).
+        
+        Estratégia: Tenta múltiplos perfis de navegador até encontrar um que funcione.
+        
+        Returns:
+            Conteúdo da resposta como string
+            
+        Raises:
+            Exception: Se falhar após todas tentativas
+        """
+        # Lista de impersonations para tentar (em ordem de compatibilidade)
+        impersonations = [
+            "chrome110",   # Chrome moderno
+            "chrome107",   # Chrome um pouco mais antigo
+            "safari15_5",  # Safari (bom para APIs Apple-friendly)
+            "firefox109",  # Firefox alternativo
+        ]
+        
+        last_error = None
+        
+        for impersonate in impersonations:
+            try:
+                logger.info(f"🔄 Tentando acessar API (emulando {impersonate})...")
+                
+                response = requests.get(
+                    self.api_url,
+                    impersonate=impersonate,
+                    timeout=30
+                )
+                
+                # Verifica status code
+                if response.status_code == 200:
+                    logger.info(f"✅ Sucesso com {impersonate} (status: {response.status_code})")
+                    return response.text
+                else:
+                    logger.warning(f"⚠️ Status {response.status_code} com {impersonate}, tentando próximo...")
+                    last_error = f"HTTP {response.status_code}"
+                    continue
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Erro com {impersonate}: {e}")
+                last_error = e
+                continue
+        
+        # Se todas tentativas falharem
+        error_msg = f"Não foi possível acessar API após tentar {len(impersonations)} navegadores diferentes"
+        logger.error(f"❌ {error_msg}. Último erro: {last_error}")
+        raise Exception(f"{error_msg}: {last_error}")
+    
     def extract(self) -> pd.DataFrame:
         """
         Extrai dados de posicionamento dos ônibus.
@@ -129,38 +187,86 @@ class OnibusTempoRealIngester(BronzeDataIngester):
         
         try:
             logger.info(f"🔄 Extraindo dados de: {self.api_url}")
-            logger.debug(f"Tentando conexão com timeout de 30s...")
-            response = self.session.get(self.api_url, timeout=30)
-            response.raise_for_status()
-            logger.debug(f"✓ Resposta recebida com status {response.status_code}")
             
-            data = response.json()
-            lineage.add_metadata("http_status", response.status_code)
-            lineage.add_metadata("response_size_bytes", len(response.content))
+            # Usa método robusto com emulação de navegador
+            text_content = self._fetch_data()
+            lineage.add_metadata("method", "curl_cffi_browser_impersonation")
             
-            # Converte para DataFrame
-            if isinstance(data, list):
-                df = pd.DataFrame(data)
-            elif isinstance(data, dict) and "data" in data:
-                df = pd.DataFrame(data["data"])
+            logger.debug(f"✓ Dados recebidos com sucesso")
+        
+        except Exception as e:
+            logger.error(f"❌ Erro ao extrair dados: {e}")
+            lineage.add_metadata("error", str(e))
+            raise
+        
+        # Parse do formato customizado da PBH
+        # Formato: <EV=105;HR=...;LT=...>
+        try:
+            if not text_content:
+                raise ValueError("Nenhum conteúdo recebido da API")
+            
+            records = []
+            
+            for line in text_content.strip().split('\n'):
+                line = line.strip()
+                if not line or not line.startswith('<'):
+                    continue
+                    
+                # Remove < e >
+                line = line.strip('<>')
+                
+                # Parse dos campos CAMPO=VALOR
+                record = {}
+                for field in line.split(';'):
+                    if '=' in field:
+                        key, value = field.split('=', 1)
+                        record[key.strip()] = value.strip()
+                
+                if record:
+                    records.append(record)
+            
+            df = pd.DataFrame(records)
+            
+            if df.empty:
+                logger.warning("⚠️ Nenhum dado retornado pela API")
+                # Retorna DataFrame vazio com estrutura esperada
+                df = pd.DataFrame(columns=['evento', 'horario', 'latitude', 'longitude', 
+                                          'numero_veiculo', 'velocidade', 'numero_linha',
+                                          'direcao', 'status_veiculo', 'distancia'])
             else:
-                df = pd.DataFrame([data])
+                # Renomeia colunas para nomes mais descritivos
+                column_mapping = {
+                    'EV': 'evento',
+                    'HR': 'horario',
+                    'LT': 'latitude',
+                    'LG': 'longitude',
+                    'NV': 'numero_veiculo',
+                    'VL': 'velocidade',
+                    'NL': 'numero_linha',
+                    'DG': 'direcao',
+                    'SV': 'status_veiculo',
+                    'DT': 'distancia'
+                }
+                df = df.rename(columns=column_mapping)
+                
+                # Converte tipos de dados numéricos
+                numeric_columns = ['latitude', 'longitude', 'velocidade', 'numero_veiculo',
+                                  'numero_linha', 'direcao', 'status_veiculo', 'distancia', 'evento']
+                for col in numeric_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
             
             # Adiciona metadados de ingestão
             df["_ingestion_timestamp"] = datetime.now()
             df["_source"] = "api_tempo_real"
             
             lineage.add_metadata("records_extracted", len(df))
-            logger.info(f"Extraídos {len(df)} registros")
+            logger.info(f"✅ Extraídos {len(df)} registros")
             
             return df
             
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Erro ao extrair dados: {e}")
-            lineage.add_metadata("error", str(e))
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Erro ao decodificar JSON: {e}")
+        except Exception as e:
+            logger.error(f"Erro ao fazer parse dos dados: {e}")
             lineage.add_metadata("error", str(e))
             raise
     

@@ -11,10 +11,10 @@ if exist venv\Scripts\activate.bat (
     call venv\Scripts\activate.bat
 )
 
-REM Executa o pipeline
+REM Executa o pipeline como módulo
 echo.
 echo Executando pipeline...
-python src\pipeline.py %*
+python -m src.pipeline %*
 
 echo.
 echo ============================================================

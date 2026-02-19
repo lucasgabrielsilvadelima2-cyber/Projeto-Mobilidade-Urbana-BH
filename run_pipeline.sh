@@ -14,7 +14,7 @@ fi
 # Executa o pipeline
 echo ""
 echo "Executando pipeline..."
-python src/pipeline.py "$@"
+python -m src.pipeline "$@"
 
 echo ""
 echo "============================================================"

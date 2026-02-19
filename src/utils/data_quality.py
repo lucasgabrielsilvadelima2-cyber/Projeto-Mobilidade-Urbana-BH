@@ -44,18 +44,18 @@ class DataQualityValidator:
             "latitude": Column(
                 float,
                 checks=[
-                    Check.in_range(-20.0, -19.7),
-                    Check(lambda s: ~s.isna(), error="Latitude não pode ser nula")
+                    # BH: latitude entre -20.09 e -19.77 (com margem)
+                    Check.in_range(-20.1, -19.7),
                 ],
-                nullable=False
+                nullable=True  # Permite valores ausentes que serão filtrados
             ),
             "longitude": Column(
                 float,
                 checks=[
-                    Check.in_range(-44.1, -43.8),
-                    Check(lambda s: ~s.isna(), error="Longitude não pode ser nula")
+                    # BH: longitude entre -44.10 e -43.85 (com margem)
+                    Check.in_range(-44.15, -43.8),
                 ],
-                nullable=False
+                nullable=True  # Permite valores ausentes
             ),
             "velocidade": Column(
                 float,

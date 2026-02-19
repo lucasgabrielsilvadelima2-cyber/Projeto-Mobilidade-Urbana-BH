@@ -17,7 +17,7 @@ data_sources:
     url: "https://dados.pbh.gov.br/dataset/mapa-de-controle-operacional-mco"
     format: "csv"
     update_frequency_minutes: 1440  # Atualizado diariamente
-    enabled: true
+    enabled: false  # Desabilitado temporariamente devido a bloqueio 403
 
 # Configurações das Camadas
 layers:
