@@ -5,19 +5,32 @@ echo ============================================================
 echo Pipeline de Dados - Mobilidade Urbana BH
 echo ============================================================
 
-REM Ativa ambiente virtual se existir
-if exist venv\Scripts\activate.bat (
-    echo Ativando ambiente virtual...
-    call venv\Scripts\activate.bat
+REM Verifica qual ambiente virtual existe e usa
+if exist .venv\Scripts\python.exe (
+    echo Usando Python do ambiente virtual (.venv^)...
+    echo.
+    echo Executando pipeline...
+    .venv\Scripts\python.exe -m src.pipeline %*
+    goto :end
 )
 
-REM Executa o pipeline como módulo
+if exist venv\Scripts\python.exe (
+    echo Usando Python do ambiente virtual (venv^)...
+    echo.
+    echo Executando pipeline...
+    venv\Scripts\python.exe -m src.pipeline %*
+    goto :end
+)
+
+echo AVISO: Ambiente virtual nao encontrado!
+echo Tentando usar Python do sistema...
 echo.
 echo Executando pipeline...
 python -m src.pipeline %*
 
+:end
 echo.
 echo ============================================================
-echo Pipeline concluído!
+echo Pipeline concluido!
 echo ============================================================
 pause

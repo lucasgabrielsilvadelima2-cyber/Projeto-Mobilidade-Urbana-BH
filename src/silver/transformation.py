@@ -179,6 +179,15 @@ class OnibusTransformer(SilverTransformer):
             if dropped_coords > 0:
                 logger.warning(f"Removidos {dropped_coords} registros com coordenadas inválidas")
             
+            # Remove velocidades outliers (sensores GPS com erro)
+            # Ônibus urbano não ultrapassa 120 km/h - valores maiores são erro de sensor
+            if "velocidade" in df.columns:
+                initial_count = len(df)
+                df = df[df["velocidade"] <= 120.0]
+                dropped_vel = initial_count - len(df)
+                if dropped_vel > 0:
+                    logger.warning(f"Removidos {dropped_vel} registros com velocidade outlier (>120 km/h)")
+            
             # Remove duplicatas
             df = remove_duplicates(
                 df,
